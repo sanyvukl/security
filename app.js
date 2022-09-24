@@ -3,7 +3,8 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 const ejs = require("ejs");
 
 
@@ -31,16 +32,21 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", (req, res)=>{
-    const newUser = new User({
-        email: req.body.userEmail,
-        password: md5(req.body.userPassword)
-    });
-    newUser.save(function(err){
-        if(!err){
-           res.render("secrets");
-        }else{
-            console.log(err);
-        }
+
+    bcrypt.hash(req.body.userPassword, saltRounds,
+        function(err, hash){
+            
+        const newUser = new User({
+            email: req.body.userEmail,
+            password: hash
+        });
+        newUser.save(function(err){
+            if(!err){
+               res.render("secrets");
+            }else{
+                console.log(err);
+            }
+        });
     });
 });
 
@@ -50,12 +56,19 @@ app.get("/login", function(req, res){
 
 app.post("/login", function(req, res){
     const email =  req.body.userEmail;
-    const password = md5(req.body.userPassword);
+    const password = req.body.userPassword;
+
     User.findOne(
         {email: email},
         function(err, foundUser){
-            if(!err && foundUser && foundUser.password === password){
-                res.render("secrets");
+            /* const hash = foundUser.password; */
+            /* hash = $2c123p12nrpi.... because we are reading from database */
+            if(!err && foundUser){
+                bcrypt.compare(password,  foundUser.password, function(err, result){
+                    if(result){
+                        res.render("secrets");
+                    }
+                });
             }else{
                 res.send(err||"Check your email or password");
             }
@@ -63,6 +76,9 @@ app.post("/login", function(req, res){
     );
 })
 
+app.get("/logout", function(req,res){
+    res.redirect("/");
+})
 app.listen(3000, function(req, req){
     console.log("Server is running on port 3000");
 });
